@@ -16,7 +16,7 @@ goog.require('lime.animation.MoveTo');
 
 // entrypoint
 helloworld.start = function(){
-	alert("HE");
+	// alert("HE");
 	var director = new lime.Director(document.body,1024,768),
 	    scene = new lime.Scene(),
 

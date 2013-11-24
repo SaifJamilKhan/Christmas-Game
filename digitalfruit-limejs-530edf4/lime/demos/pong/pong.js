@@ -46,6 +46,7 @@ pong.newgame = function(mode) {
 	scene.appendChild(layer);
 
 	var game = new pong.Game(mode);
+	debugger;
 	layer.appendChild(game);
 	
 
