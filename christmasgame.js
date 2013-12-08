@@ -8,6 +8,7 @@ goog.require('lime.GlossyButton');
 goog.require('lime.Layer');
 goog.require('lime.Scene');
 goog.require('lime.animation.MoveTo');
+goog.require('lime.animation.ScaleTo');
 goog.require('lime.animation.MoveBy');
 // goog.require('christmasgame.Game');
 var scene;
@@ -17,7 +18,7 @@ var backGroundLayer;
 var flyingObjectLayer;
 var listOfGifts = [];
 var numberOfGifts = 3;
-var typesOfFlyingObjects = 5;
+var typesOfFlyingObjects = 7;
 var ObjectEnum = {
     Player1: 1,
     Player2: 2,
@@ -65,8 +66,9 @@ christmasgame.newgame = function(mode) {
 christmasgame.setUpBackground = function(){
    scene = new lime.Scene();
 
-    // var backGround = new lime.Sprite().setSize(1000,1000).setPosition(0,0).setFill('images/christmas_background.gif');
-    // backGroundLayer.appendChild(backGround);
+    var backGround = new lime.Sprite().setSize(1000,1000).setPosition(0,0).setFill('images/christmas_background.gif');
+    backGroundLayer.appendChild(backGround);
+    christmasgame.setUpObjectDetection(backGround);
     var btn = new lime.GlossyButton('Start').setSize(100, 40).setPosition(500, 50);
         goog.events.listen(btn, 'click', function() {
                     christmasgame.resetGame();
@@ -74,6 +76,86 @@ christmasgame.setUpBackground = function(){
     backGroundLayer.appendChild(btn);
     christmasgame.director.replaceScene(scene);
 }
+
+christmasgame.setUpObjectDetection = function(backGround){
+     var listOfDetectedObjects;
+    goog.events.listen(backGround,['mousedown','touchstart'],function(e){
+         
+        goog.events.listen(backGround, 'mousemove', function(f) {
+            
+             
+            listOfDetectedObjects = christmasgame.findObjectsUnderPoint(f.position);
+            //if(listOfDectedObjects[0]//console.log(f);
+           // alert(listOfDetectedObjects);
+
+ 
+            if(listOfDetectedObjects){
+               // alert(listOfDetectedObjects);
+                for(var y = 0; y < listOfDetectedObjects.length; y++){
+                    var currentFlyingObject = listOfDetectedObjects[y];
+                    // console.log(listOfDetectedObjects[y]);
+                    if(currentFlyingObject.animations && currentFlyingObject.animations.length> 1){
+                        break
+                    }
+                    if(currentFlyingObject.animations.length>0){
+                        currentFlyingObject.animations[0].shouldEndAnimationList = true;
+                        currentFlyingObject.animations[0].stop();
+                        currentFlyingObject.animations.splice(0,1);
+                        // console.log('stopped' + currentFlyingObject.animations[0]);
+                    }
+                    var scaleBig = new lime.animation.ScaleTo(1.5).setDuration(2);
+                    christmasgame.runAnimationOn(scaleBig, currentFlyingObject);
+
+                    console.log('ran big');
+                    goog.events.listen(scaleBig,lime.animation.Event.STOP,function(){
+
+                        var scaleSmall = new lime.animation.ScaleTo(1).setDuration(2);
+                        goog.events.listen(scaleSmall,lime.animation.Event.STOP,function(){
+
+                               var moveToBottom = new lime.animation.MoveTo(currentFlyingObject.position_.x, 600).setDuration(1);
+                               goog.events.listen(moveToBottom,lime.animation.Event.STOP,function(){
+                                currentFlyingObject.isMoving = false;
+                               })
+                               currentFlyingObject.runAction(moveToBottom);
+
+                               console.log('ran bottom');
+                               debugger;
+                               christmasgame.runAnimationOn(moveToBottom, currentFlyingObject);
+                         });
+                       currentFlyingObject.runAction(scaleSmall);
+
+                        console.log('ran small');
+                       christmasgame.runAnimationOn(scaleSmall, currentFlyingObject);
+                    });
+
+
+                }
+            }
+        });
+
+        goog.events.listen(backGround, ['mouseup','touchend','touchcancel'], function(e) {
+             goog.events.unlisten(backGround, 'mousemove', function(){});
+        });
+
+    });
+}
+
+christmasgame.findObjectsUnderPoint = function(position){
+    var listOfFoundObjects = [];
+    for(var x =0; x< listOfGifts.length; x++){
+        var gift = listOfGifts[x];
+        for(var y = 0; y < gift.listOfFlyingObjects.length; y++){
+            var flyingObject = gift.listOfFlyingObjects[y];
+            if(flyingObject.isMoving){
+                var objectRect = flyingObject.getBoundingBox();
+                if(objectRect.contains(position)) listOfFoundObjects.push(flyingObject);
+            }
+        }
+    }
+    if(listOfFoundObjects.length >0) return listOfFoundObjects;
+    return false;
+}
+
 
 christmasgame.setUpGifts = function(){
 
@@ -86,7 +168,6 @@ christmasgame.setUpGifts = function(){
 christmasgame.setUpGift = function(postitionx, postitiony, id){
     var gift = new lime.Sprite().setSize(100,100).setPosition(postitionx, postitiony).setFill('images/box.PNG');
     gift.id = id;
-    console.log('id set to' + gift.id);
     gift.flyingObjectCount = 0;
     giftLayer.appendChild(gift);
     giftLayer.gift = gift;
@@ -104,6 +185,10 @@ christmasgame.setUpFlyingObjectsFrom = function(gift, numberOfObjects){
         gift.flyingObjectCount = gift.flyingObjectCount % typesOfFlyingObjects;
         gift.flyingObjectCount++;
         var flyingObject = new lime.Sprite().setSize(100,100).setPosition(gift.position_.x, gift.position_.y + 200).setFill('images/flyingObject'+gift.flyingObjectCount + '.png');
+        flyingObject.startPostion = {};
+        flyingObject.startPostion.x = gift.position_.x;
+        flyingObject.startPostion.y = gift.position_.y + 200;
+        flyingObject.animations = [];
         flyingObject.flyingObjectCount = gift.flyingObjectCount;
         flyingObjectLayer.appendChild(flyingObject);
         listOfFlyingObjects.push(flyingObject);
@@ -114,28 +199,47 @@ christmasgame.setUpFlyingObjectsFrom = function(gift, numberOfObjects){
 
 christmasgame.fireObjectFrom = function(gift){
     var randomNumberForFlyingObject = Math.floor((Math.random()*typesOfFlyingObjects)); 
-    var lastFlyingObject = christmasgame.selectNonMovingRandomFunction(gift, randomNumberForFlyingObject);
-    var moveToTop = new lime.animation.MoveTo(lastFlyingObject.position_.x, 50 * randomNumberForFlyingObject + 100).setDuration(randomNumberForFlyingObject/4 + 1);
+    var lastFlyingObject = christmasgame.selectNonMovingRandomFlyingObject(gift, randomNumberForFlyingObject);
+    var moveToTop = new lime.animation.MoveTo(lastFlyingObject.position_.x, 25 * randomNumberForFlyingObject + 50).setDuration(randomNumberForFlyingObject/4 + 1);
+ 
     goog.events.listen(moveToTop,lime.animation.Event.STOP,function(){
-      // lastFlyingObject.setPosition(lastFlyingObject.position_.x, 600);
-       var moveToBottom = new lime.animation.MoveTo(lastFlyingObject.position_.x, 600).setDuration(randomNumberForFlyingObject/4 + 1);
-       goog.events.listen(moveToBottom,lime.animation.Event.STOP,function(){
-        lastFlyingObject.isMoving = false;
-       });
-       lastFlyingObject.runAction(moveToBottom);
-    });
+        if(!moveToTop.shouldEndAnimationList){
 
-    lastFlyingObject.runAction(moveToTop);
+               console.log('evil move to bottom ran');
+               debugger;
+               console.log(moveToTop.shouldEndAnimationList);
+               var moveToBottom = new lime.animation.MoveTo(lastFlyingObject.position_.x, 600).setDuration(randomNumberForFlyingObject/4 + 1);
+               goog.events.listen(moveToBottom,lime.animation.Event.STOP,function(){
+                lastFlyingObject.isMoving = false;
+               });
+                 christmasgame.runAnimationOn(moveToBottom, lastFlyingObject);
+        }
+    });
+    christmasgame.runAnimationOn(moveToTop, lastFlyingObject);
     gift.listOfFlyingObjects.push(lastFlyingObject);
     gift.listOfFlyingObjects.splice(randomNumberForFlyingObject,1);
-    setTimeout(function(){ christmasgame.fireObjectFrom(gift)}, 1000 + (1000 * randomNumberForFlyingObject));
+    setTimeout(function(){ christmasgame.fireObjectFrom(gift)}, 500 + (500 * randomNumberForFlyingObject));
 }
 
-christmasgame.selectNonMovingRandomFunction = function(gift, randomNumberForFlyingObject){
+christmasgame.runAnimationOn = function(animation, object){
+    object.runAction(animation);
+    // if(!object.animations) debugger;
+    object.animations.push(animation);
+    var index = object.length -1;
+    goog.events.listen(animation,lime.animation.Event.STOP,function(){
+        object.animations.splice(index,1);
+    });
+}
 
+christmasgame.stopAllAnimatonsOn = function (object){
+    // for each(var animation in object.animations){
+
+    // }
+}
+
+christmasgame.selectNonMovingRandomFlyingObject = function(gift, randomNumberForFlyingObject){
     var lastFlyingObject = gift.listOfFlyingObjects[randomNumberForFlyingObject];
     while(lastFlyingObject.isMoving){
-        console.log('its this');
         randomNumberForFlyingObject = Math.floor((Math.random()*typesOfFlyingObjects)); 
         lastFlyingObject = gift.listOfFlyingObjects[randomNumberForFlyingObject];
     }
@@ -144,23 +248,6 @@ christmasgame.selectNonMovingRandomFunction = function(gift, randomNumberForFlyi
 }
 
 christmasgame.resetGame = function (){
-    var moveToTop = new lime.animation.MoveBy(0,-50).setDuration(2);
-    // setTimeout(function(){
-    listOfGifts[1].runAction(moveToTop);
-        // goog.events.listen(moveToTop,lime.animation.Event.STOP,function(){
-        //     // scene.removeChild(flyingObject);
-        // //     flyingObject = null;
-        // })
-    // }, 1);
-
-    return;
-    //clear all variables, remove all sprites, and 
-    giftLayer.
-    flyingObject.flyingObjectIndex ++;
-    flyingObject = new lime.Sprite().setSize(100,100).setPosition(350,400).setFill('images/box.PNG');
-    giftLayer.appendChild(gift);
-    giftFront = new lime.Sprite().setSize(80,80).setPosition(350,420).setFill('images/box_front.png');
-    giftLayer.appendChild(giftFront);
 }
 
 //this is required for outside access after code is compiled in ADVANCED_COMPILATIONS mode
