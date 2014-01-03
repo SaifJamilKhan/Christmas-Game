@@ -8,6 +8,7 @@ goog.require('lime.GlossyButton');
 goog.require('lime.Layer');
 goog.require('lime.Scene');
 goog.require('lime.animation.MoveTo');
+goog.require('lime.animation.MoveBy');
 goog.require('lime.animation.ScaleTo');
 goog.require('lime.animation.MoveBy');
 // goog.require('christmasgame.Game');
@@ -85,28 +86,25 @@ christmasgame.setUpObjectDetection = function(backGround){
             
              
             listOfDetectedObjects = christmasgame.findObjectsUnderPoint(f.position);
-            //if(listOfDectedObjects[0]//console.log(f);
-           // alert(listOfDetectedObjects);
-
- 
+           
             if(listOfDetectedObjects){
-               // alert(listOfDetectedObjects);
                 for(var y = 0; y < listOfDetectedObjects.length; y++){
                     var currentFlyingObject = listOfDetectedObjects[y];
-                    // console.log(listOfDetectedObjects[y]);
-                    if(currentFlyingObject.animations && currentFlyingObject.animations.length> 1){
-                        break
-                    }
+                    // if(currentFlyingObject.animations && currentFlyingObject.animations.length> 1){
+                    //     break
+                    // }
+                    console.log('length is' +currentFlyingObject.animations.length );
                     if(currentFlyingObject.animations.length>0){
                         currentFlyingObject.animations[0].shouldEndAnimationList = true;
                         currentFlyingObject.animations[0].stop();
+                        console.log('spliced' + currentFlyingObject.animations[0].type);
                         currentFlyingObject.animations.splice(0,1);
                         // console.log('stopped' + currentFlyingObject.animations[0]);
                     }
                     var scaleBig = new lime.animation.ScaleTo(1.5).setDuration(2);
                     christmasgame.runAnimationOn(scaleBig, currentFlyingObject);
-
-                    console.log('ran big');
+                    scaleBig.type = 'scale big';
+                    // console.log('ran big');
                     goog.events.listen(scaleBig,lime.animation.Event.STOP,function(){
 
                         var scaleSmall = new lime.animation.ScaleTo(1).setDuration(2);
@@ -116,23 +114,24 @@ christmasgame.setUpObjectDetection = function(backGround){
                                goog.events.listen(moveToBottom,lime.animation.Event.STOP,function(){
                                 currentFlyingObject.isMoving = false;
                                })
-                               currentFlyingObject.runAction(moveToBottom);
+                               // currentFlyingObject.runAction(moveToBottom);
 
-                               console.log('ran bottom');
+                               // console.log('ran bottom');
                                debugger;
                                christmasgame.runAnimationOn(moveToBottom, currentFlyingObject);
+                                moveToBottom.type = 'move bottom';
+
                          });
-                       currentFlyingObject.runAction(scaleSmall);
+                       // currentFlyingObject.runAction(scaleSmall);
 
-                        console.log('ran small');
+                        // console.log('ran small');
                        christmasgame.runAnimationOn(scaleSmall, currentFlyingObject);
+                          scaleSmall.type = 'scale small';
+
                     });
-
-
                 }
             }
         });
-
         goog.events.listen(backGround, ['mouseup','touchend','touchcancel'], function(e) {
              goog.events.unlisten(backGround, 'mousemove', function(){});
         });
@@ -199,23 +198,27 @@ christmasgame.setUpFlyingObjectsFrom = function(gift, numberOfObjects){
 
 christmasgame.fireObjectFrom = function(gift){
     var randomNumberForFlyingObject = Math.floor((Math.random()*typesOfFlyingObjects)); 
+    var howFarItMovedUp = (25 * randomNumberForFlyingObject + 50) - 600;
     var lastFlyingObject = christmasgame.selectNonMovingRandomFlyingObject(gift, randomNumberForFlyingObject);
-    var moveToTop = new lime.animation.MoveTo(lastFlyingObject.position_.x, 25 * randomNumberForFlyingObject + 50).setDuration(randomNumberForFlyingObject/4 + 1);
- 
+
+    var moveToTop = new lime.animation.MoveBy(0, howFarItMovedUp).setDuration(randomNumberForFlyingObject/4 + 1);
+    // var moveLeft = new lime.animation.MoveBy(-150,0).setDuration(0.1);
+    // lastFlyingObject.runAction(moveLeft);
+
     goog.events.listen(moveToTop,lime.animation.Event.STOP,function(){
         if(!moveToTop.shouldEndAnimationList){
-
-               console.log('evil move to bottom ran');
-               debugger;
-               console.log(moveToTop.shouldEndAnimationList);
-               var moveToBottom = new lime.animation.MoveTo(lastFlyingObject.position_.x, 600).setDuration(randomNumberForFlyingObject/4 + 1);
+               var moveToBottom = new lime.animation.MoveBy(0, -howFarItMovedUp).setDuration(randomNumberForFlyingObject/4 + 1);
                goog.events.listen(moveToBottom,lime.animation.Event.STOP,function(){
                 lastFlyingObject.isMoving = false;
                });
                  christmasgame.runAnimationOn(moveToBottom, lastFlyingObject);
+                    moveToBottom.type = 'move to bottom';
+
         }
     });
     christmasgame.runAnimationOn(moveToTop, lastFlyingObject);
+                    moveToTop.type = 'MOVE TO top';
+
     gift.listOfFlyingObjects.push(lastFlyingObject);
     gift.listOfFlyingObjects.splice(randomNumberForFlyingObject,1);
     setTimeout(function(){ christmasgame.fireObjectFrom(gift)}, 500 + (500 * randomNumberForFlyingObject));
@@ -225,9 +228,16 @@ christmasgame.runAnimationOn = function(animation, object){
     object.runAction(animation);
     // if(!object.animations) debugger;
     object.animations.push(animation);
+        console.log(object.animations);
+    
     var index = object.length -1;
     goog.events.listen(animation,lime.animation.Event.STOP,function(){
+        console.log(index);
+        console.log(object.animations);
+        // console.log('spliced' + object.animations[index].type);
         object.animations.splice(index,1);
+        console.log(object.animations);
+
     });
 }
 
